@@ -1,0 +1,677 @@
+---
+title: "Brain regression"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+# Load necessary libraries
+library(ggplot2)  # For plotting
+library(dplyr)    # For data manipulation
+
+# Load the data
+X <- read.csv("X.csv")  # Input sound signal and categorical variable
+y <- read.csv("y.csv")  # Output MEG signal
+time <- read.csv("time.csv")  # Sampling time
+
+# Combine the data into a single data frame for easier analysis
+data <- data.frame(time = time$time, x1 = X$x1, x2 = as.factor(X$x2), y = y$y)
+
+# Display the first few rows of the combined data
+head(data)
+```
+
+This data has 200 rows and now contains all the 3 datasets combined in one dataset. This will enable for easier analysis throughout this project.
+
+# Task 1: Preliminary data analysis
+
+## Time series plot
+
+```{r}
+# Time series plot of the input audio signal (x1)
+ggplot(data, aes(x = time, y = x1)) +
+  geom_line(color = "blue") +
+  labs(title = "Time Series of Input Audio Signal (x1)",
+       x = "Time (seconds)",
+       y = "Audio Signal (x1)") +
+  theme_minimal()
+
+# Time series plot of the output MEG signal (y)
+ggplot(data, aes(x = time, y = y)) +
+  geom_line(color = "red") +
+  labs(title = "Time Series of Output MEG Signal (y)",
+       x = "Time (seconds)",
+       y = "MEG Signal (y)") +
+  theme_minimal()
+```
+
+Before we move on let's break down these graph.
+
+### Time series of Input Audio Signal (x1)
+The audio signal (x1) is a representation of the sound wave over time, capturing the amplitude of the sound wave at each time point. 
+While the sound waves oscillate around the baseline (zero), the negative values represent the troughs of the wave and positive values represent the peaks.
+We can see that overall, the first 10 seconds had more peaks compared to the second 10 seconds. That means on average we had louder sounds, e.g. claps or change in voice tone, on the first 10 seconds more. 
+
+
+### Time series of Output MEG Signal (y)
+The MEG signal (y) measures the magnetic fields produced by neural activity in the brain. It reflects the brain's response to the audio signal. 
+The magnitude of the value indicates the strength of the brain's response.
+While the highest peak in the graph was in the first 10 seconds, we could argue on average there are higher peaks (i.e. values) in the second 10 seconds than the first 10 seconds by slightly. Also we if we observe the period of second 8-12, we can see the big shift. In 8-10, the magnitude is quite steady and quite low. However, in second 10-12, we can see the spike in the values, indicating the shift in the brain response. This backs up the initial hypothesis of  "The researchers
+hypothesis that the emotional narration will evoke an increased brain response."
+
+
+## Distibution
+
+```{r}
+# Distribution of the input audio signal (x1)
+ggplot(data, aes(x = x1)) +
+  geom_histogram(binwidth = 0.1, fill = "blue", color = "black") +
+  labs(title = "Distribution of Input Audio Signal (x1)",
+       x = "Audio Signal (x1)",
+       y = "Frequency") +
+  theme_minimal()
+
+# Distribution of the output MEG signal (y)
+ggplot(data, aes(x = y)) +
+  geom_histogram(binwidth = 0.1, fill = "red", color = "black") +
+  labs(title = "Distribution of Output MEG Signal (y)",
+       x = "MEG Signal (y)",
+       y = "Frequency") +
+  theme_minimal()
+```
+We used histogram to visualize the distribution of both the input and the output.
+
+### Distribution of Input Audio Signal (x1)
+
+We can see that the distribution of the Input Audio Signal is normally distributed with its mean being zero. This is because the sound wave oscilates around zero. 
+
+### Distribution of Output MEG Signal (y)
+
+The histogram of the MEG signal (y) appears to be right-skewed, with most values clustered around the mean (~15). It appears to be chi-squared distribution or a gamma distribution. The right-skewed distribution suggests that most of the time, the brain’s response is moderate (clustered around the mean), but there are occasional periods of heightened activity (the long tail to the right)
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Filter data for neutral (x2 = 0) and emotional (x2 = 1) periods
+data_neutral <- data %>% filter(x2 == 0)
+data_emotional <- data %>% filter(x2 == 1)
+
+# Plot histogram for neutral period
+ggplot(data_neutral, aes(x = y)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black") +
+  labs(title = "Distribution of MEG Signal (y) - Neutral (x2 = 0)",
+       x = "MEG Signal (y)",
+       y = "Frequency") +
+  theme_minimal()
+
+# Plot histogram for emotional period
+ggplot(data_emotional, aes(x = y)) +
+  geom_histogram(binwidth = 1, fill = "red", color = "black") +
+  labs(title = "Distribution of MEG Signal (y) - Emotional (x2 = 1)",
+       x = "MEG Signal (y)",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+These two histograms are for MEG signal however, the blue one is for x2 = 0, i.e. neutral period (first 10 seconds). The red one is the emotional phase (second 10 seconds). The mean of the first histogram might be higher than the second one, however, there are more signals present with higher values in the second graph compared to the first, which showcases the emotional side of the input. 
+
+
+## Correlation and scatter plot
+
+```{r}
+# Scatter plot of x1 vs y
+ggplot(data, aes(x = x1, y = y)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  labs(title = "Scatter Plot: Audio Signal (x1) vs MEG Signal (y)",
+       x = "Audio Signal (x1)",
+       y = "MEG Signal (y)") +
+  theme_minimal()
+
+# Correlation coefficient between x1 and y
+correlation <- cor(data$x1, data$y)
+print(paste("Correlation between x1 and y:", correlation))
+```
+
+It seems that they are highly correlated given that its not linear. It's more of a like quadratic relationship. Now let's plot the boxplot of the output signal for both neutral and emotional periods.
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Create boxplot of MEG signal (y) by sound category (x2)
+ggplot(data, aes(x = x2, y = y, fill = x2)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of MEG Signal (y) by Sound Category (x2)",
+       x = "Sound Category (x2)",
+       y = "MEG Signal (y)",
+       fill = "Sound Category") +
+  scale_fill_manual(values = c("0" = "blue", "1" = "red"),  # Custom colors for neutral and emotional
+                    labels = c("0" = "Neutral", "1" = "Emotional")) +  # Custom labels
+  theme_minimal()
+```
+
+We can see that in the Interquatlie Range (IQR), the emotional boxplot is slightly higher. Also the minimum of emotional boxplot is quite consideribly higher compared to the minimum of neutral boxplot. 
+
+
+#Task 2: Regression
+
+## Task 2.1
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Prepare the data
+data <- data %>% mutate(
+  x1_sq = x1^2,  # x1^2
+  x1_cubed = x1^3,  # x1^3
+  x1_4 = x1^4,  # x1^4
+  x1_5 = x1^5,  # x1^5
+  x2 = as.numeric(x2)  # Ensure x2 is numeric
+)
+
+# Function to estimate parameters using least squares
+estimate_parameters <- function(X, y) {
+  X <- as.matrix(X)  # Ensure X is a numeric matrix
+  theta <- solve(t(X) %*% X) %*% t(X) %*% y
+  return(theta)
+}
+
+# Model 1: y = theta1 * x1^3 + theta2 * x1^5 + theta3 * x2 + theta_bias
+X1 <- data %>% dplyr::select(x1_cubed, x1_5, x2) %>% mutate(bias = 1)
+theta1 <- estimate_parameters(X1, data$y)
+
+# Model 2: y = theta1 * x1 + theta2 * x2 + theta_bias
+X2 <- data %>% dplyr::select(x1, x2) %>% mutate(bias = 1)
+theta2 <- estimate_parameters(X2, data$y)
+
+# Model 3: y = theta1 * x1 + theta2 * x1^2 + theta3 * x1^4 + theta4 * x2 + theta_bias
+X3 <- data %>% dplyr::select(x1, x1_sq, x1_4, x2) %>% mutate(bias = 1)
+theta3 <- estimate_parameters(X3, data$y)
+
+# Model 4: y = theta1 * x1 + theta2 * x1^2 + theta3 * x1^3 + theta4 * x1^5 + theta5 * x2 + theta_bias
+X4 <- data %>% dplyr::select(x1, x1_sq, x1_cubed, x1_5, x2) %>% mutate(bias = 1)
+theta4 <- estimate_parameters(X4, data$y)
+
+# Model 5: y = theta1 * x1 + theta2 * x1^3 + theta3 * x1^4 + theta4 * x2 + theta_bias
+X5 <- data %>% dplyr::select(x1, x1_cubed, x1_4, x2) %>% mutate(bias = 1)
+theta5 <- estimate_parameters(X5, data$y)
+
+# Display the estimated parameters
+print("Model 1 Parameters:")
+print(theta1)
+
+print("Model 2 Parameters:")
+print(theta2)
+
+print("Model 3 Parameters:")
+print(theta3)
+
+print("Model 4 Parameters:")
+print(theta4)
+
+print("Model 5 Parameters:")
+print(theta5)
+```
+
+
+
+## Task 2.2
+
+```{r}
+# Ensure x2 is numeric
+data <- data %>% mutate(x2 = as.numeric(x2))
+
+# Function to compute predictions
+compute_predictions <- function(X, theta) {
+  X <- as.matrix(X)  # Ensure X is a numeric matrix
+  y_pred <- X %*% theta
+  return(y_pred)
+}
+
+# Function to compute RSS
+compute_rss <- function(y, y_pred) {
+  residuals <- y - y_pred
+  rss <- sum(residuals^2)
+  return(rss)
+}
+
+# Compute RSS for each model
+rss1 <- compute_rss(data$y, compute_predictions(X1, theta1))
+rss2 <- compute_rss(data$y, compute_predictions(X2, theta2))
+rss3 <- compute_rss(data$y, compute_predictions(X3, theta3))
+rss4 <- compute_rss(data$y, compute_predictions(X4, theta4))
+rss5 <- compute_rss(data$y, compute_predictions(X5, theta5))
+
+# Display the RSS for each model
+print("RSS for Model 1:")
+print(rss1)
+
+print("RSS for Model 2:")
+print(rss2)
+
+print("RSS for Model 3:")
+print(rss3)
+
+print("RSS for Model 4:")
+print(rss4)
+
+print("RSS for Model 5:")
+print(rss5)
+
+```
+The one with the lowest RSS is model 3 which makes it the best fit.
+
+## Task 2.3
+```{r}
+# Function to compute log-likelihood
+compute_log_likelihood <- function(rss, n) {
+  sigma2 <- rss / n  # Estimate variance of residuals
+  log_likelihood <- -n/2 * log(2 * pi) - n/2 * log(sigma2) - 1/(2 * sigma2) * rss
+  return(log_likelihood)
+}
+
+# Number of observations
+n <- nrow(data)
+
+# Compute log-likelihood for each model
+log_likelihood1 <- compute_log_likelihood(rss1, n)
+log_likelihood2 <- compute_log_likelihood(rss2, n)
+log_likelihood3 <- compute_log_likelihood(rss3, n)
+log_likelihood4 <- compute_log_likelihood(rss4, n)
+log_likelihood5 <- compute_log_likelihood(rss5, n)
+
+# Display the log-likelihood for each model
+print("Log-Likelihood for Model 1:")
+print(log_likelihood1)
+
+print("Log-Likelihood for Model 2:")
+print(log_likelihood2)
+
+print("Log-Likelihood for Model 3:")
+print(log_likelihood3)
+
+print("Log-Likelihood for Model 4:")
+print(log_likelihood4)
+
+print("Log-Likelihood for Model 5:")
+print(log_likelihood5)
+```
+With log-likelihood, the highest one was model 3, which means its the best model.
+
+
+## Task 2.4
+
+We will calculate the AIC and BIC using these formulas
+
+$$
+AIC = 2k - 2logL \\
+BIC = klogn - 2logL
+
+
+$$
+
+Where:
+k is the number of parameters in the model.
+n is the number of observations.
+logL is the log-likelihood of the model.
+
+```{r}
+# Function to compute AIC
+compute_aic <- function(log_likelihood, k) {
+  aic <- 2 * k - 2 * log_likelihood
+  return(aic)
+}
+
+# Function to compute BIC
+compute_bic <- function(log_likelihood, k, n) {
+  bic <- k * log(n) - 2 * log_likelihood
+  return(bic)
+}
+
+# Number of observations
+n <- nrow(data)
+
+# Number of parameters for each model
+k1 <- length(theta1)  # Model 1
+k2 <- length(theta2)  # Model 2
+k3 <- length(theta3)  # Model 3
+k4 <- length(theta4)  # Model 4
+k5 <- length(theta5)  # Model 5
+
+# Compute AIC and BIC for each model
+aic1 <- compute_aic(log_likelihood1, k1)
+bic1 <- compute_bic(log_likelihood1, k1, n)
+
+aic2 <- compute_aic(log_likelihood2, k2)
+bic2 <- compute_bic(log_likelihood2, k2, n)
+
+aic3 <- compute_aic(log_likelihood3, k3)
+bic3 <- compute_bic(log_likelihood3, k3, n)
+
+aic4 <- compute_aic(log_likelihood4, k4)
+bic4 <- compute_bic(log_likelihood4, k4, n)
+
+aic5 <- compute_aic(log_likelihood5, k5)
+bic5 <- compute_bic(log_likelihood5, k5, n)
+
+# Display AIC and BIC for each model
+print("AIC and BIC for Model 1:")
+print(paste("AIC:", aic1, "BIC:", bic1))
+
+print("AIC and BIC for Model 2:")
+print(paste("AIC:", aic2, "BIC:", bic2))
+
+print("AIC and BIC for Model 3:")
+print(paste("AIC:", aic3, "BIC:", bic3))
+
+print("AIC and BIC for Model 4:")
+print(paste("AIC:", aic4, "BIC:", bic4))
+
+print("AIC and BIC for Model 5:")
+print(paste("AIC:", aic5, "BIC:", bic5))
+```
+
+AIC and BIC can help us further assess the models. Lower AIC and BIC indicate better model. Model 3 is has the lowest AIC and BIC. So far, model 3 seems to be the best model out of the 5 models. 
+
+## Task 2.5
+We will compute the residuals for each model using this formula
+
+$$
+residuals = y- \hat{y}
+$$
+Where y hat is the predicted value of y (MEG signal)
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Function to compute residuals
+compute_residuals <- function(y, y_pred) {
+  residuals <- y - y_pred
+  return(residuals)
+}
+
+# Compute residuals for each model
+residuals1 <- compute_residuals(data$y, compute_predictions(X1, theta1))
+residuals2 <- compute_residuals(data$y, compute_predictions(X2, theta2))
+residuals3 <- compute_residuals(data$y, compute_predictions(X3, theta3))
+residuals4 <- compute_residuals(data$y, compute_predictions(X4, theta4))
+residuals5 <- compute_residuals(data$y, compute_predictions(X5, theta5))
+
+# Function to plot histogram and Q-Q plot
+plot_residuals <- function(residuals, model_name) {
+  # Histogram
+  hist_plot <- ggplot(data.frame(residuals = residuals), aes(x = residuals)) +
+    geom_histogram(binwidth = 0.5, fill = "blue", color = "black") +
+    labs(title = paste("Histogram of Residuals -", model_name),
+         x = "Residuals",
+         y = "Frequency") +
+    theme_minimal()
+  
+  # Q-Q plot
+  qq_plot <- ggplot(data.frame(residuals = residuals), aes(sample = residuals)) +
+    stat_qq() +
+    stat_qq_line(color = "red") +
+    labs(title = paste("Q-Q Plot of Residuals -", model_name),
+         x = "Theoretical Quantiles",
+         y = "Sample Quantiles") +
+    theme_minimal()
+  
+  # Display plots
+  print(hist_plot)
+  print(qq_plot)
+}
+
+# Plot residuals for each model
+plot_residuals(residuals1, "Model 1")
+plot_residuals(residuals2, "Model 2")
+plot_residuals(residuals3, "Model 3")
+plot_residuals(residuals4, "Model 4")
+plot_residuals(residuals5, "Model 5")
+```
+
+Firstly, based on the histograms, the closer the graph looks like a bell shaped (a normal distribution), the closer its distribution is to a normal (Guassain) distibution. Out of the three models, the third model is the closest one. For the QQ-plot, if the residuals are normally distributed, the points will lie close to the red reference line. Deviation from the reference line suggests non-normality. Out of the 5 models, model 3 tends to be the closest to a normal distribution.
+
+## Task 2.6
+Now we compare all of our results so far
+
+```{r}
+# Create a data frame to compare models
+model_comparison <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"),
+  AIC = c(aic1, aic2, aic3, aic4, aic5),
+  BIC = c(bic1, bic2, bic3, bic4, bic5),
+  RSS = c(rss1, rss2, rss3, rss4, rss5)
+)
+
+# Display the model comparison
+print("Model Comparison:")
+print(model_comparison)
+
+# Select the best model based on AIC and BIC
+best_model <- model_comparison %>%
+  arrange(AIC, BIC) %>%
+  slice(1)
+
+print("Best Model:")
+print(best_model)
+```
+
+Hence we have model 3 as our best regression model
+
+
+## Task 2.7
+
+Now that we picked the best model its time to use it on our dataset. We will split the data, train the model, compute prediction and confidence intervals and lastly plot the results
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Split the data into training (70%) and testing (30%) sets
+train_index <- sample(1:nrow(data), 0.7 * nrow(data))
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Function to create design matrix for the best model
+create_design_matrix <- function(data, model_name) {
+  if (model_name == "Model 1") {
+    X <- as.matrix(data %>% select(x1_cubed, x1_5, x2) %>% mutate(bias = 1))
+  } else if (model_name == "Model 2") {
+    X <- as.matrix(data %>% select(x1, x2) %>% mutate(bias = 1))
+  } else if (model_name == "Model 3") {
+    X <- as.matrix(data %>% select(x1, x1_sq, x1_4, x2) %>% mutate(bias = 1))
+  } else if (model_name == "Model 4") {
+    X <- as.matrix(data %>% select(x1, x1_sq, x1_cubed, x1_5, x2) %>% mutate(bias = 1))
+  } else if (model_name == "Model 5") {
+    X <- as.matrix(data %>% select(x1, x1_cubed, x1_4, x2) %>% mutate(bias = 1))
+  }
+  return(X)
+}
+
+# Create design matrices for training and testing data
+X_train <- create_design_matrix(train_data, best_model$Model)
+X_test <- create_design_matrix(test_data, best_model$Model)
+
+# Estimate parameters using training data
+theta_best <- solve(t(X_train) %*% X_train) %*% t(X_train) %*% train_data$y
+
+# Compute predictions for testing data
+y_pred <- X_test %*% theta_best
+
+# Compute residuals and standard error
+residuals <- test_data$y - y_pred
+sigma <- sqrt(sum(residuals^2) / (nrow(test_data) - length(theta_best)))
+
+# Compute 95% confidence intervals
+se <- sigma * sqrt(rowSums((X_test %*% solve(t(X_train) %*% X_train)) * X_test))
+ci_lower <- y_pred - 1.96 * se
+ci_upper <- y_pred + 1.96 * se
+
+# Combine results into a data frame
+results <- data.frame(
+  time = test_data$time,
+  y_true = test_data$y,
+  y_pred = y_pred,
+  ci_lower = ci_lower,
+  ci_upper = ci_upper
+)
+
+# Plot predictions and confidence intervals
+ggplot(results, aes(x = time)) +
+  geom_line(aes(y = y_true, color = "True MEG Signal"), size = 1) +
+  geom_line(aes(y = y_pred, color = "Predicted MEG Signal"), size = 1) +
+  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), alpha = 0.2, fill = "blue") +
+  labs(title = "Model Predictions with 95% Confidence Intervals",
+       x = "Time (seconds)",
+       y = "MEG Signal (y)",
+       color = "Legend") +
+  theme_minimal()
+```
+
+
+# Task 3: Approximate Bayesian Computation (ABC)
+
+## Identify the 2 Most Influential Parameters
+
+We’ll select the 2 parameters with the largest absolute values from model 3's least squares estimates. The rest of the parameters will remain fixed with their initial values from task 2.1 
+
+```{r}
+# Identify Top 2 Parameters ---
+theta_best <- theta3  # Parameters from Model 3
+theta_names <- c("θ1 (x1)", "θ2 (x1²)", "θ3 (x1⁴)", "θ4 (x2)", "θ_bias")
+
+# Find the 2 most influential parameters (largest absolute values)
+top_params <- order(abs(theta_best), decreasing = TRUE)[1:2]
+theta_fixed <- theta_best[-top_params]  # Fix other parameters
+print(paste("Parameters to estimate:", theta_names[top_params]))
+```
+
+
+## Defining priors
+
+We will use uniform distribution as prior centered around the least squares estimates with a range of ±50% of the estimated value.
+
+```{r}
+# Define Uniform Priors 
+prior_range <- 0.5  # ±50% range around estimated values
+prior_lower <- theta_best[top_params] * (1 - prior_range)
+prior_upper <- theta_best[top_params] * (1 + prior_range)
+
+# Function to sample from the prior
+sample_prior <- function(n) {
+  theta1_samples <- runif(n, prior_lower[1], prior_upper[1])
+  theta2_samples <- runif(n, prior_lower[2], prior_upper[2])
+  cbind(theta1_samples, theta2_samples)
+}
+```
+
+
+
+## Rejection ABC
+
+We will simulate data for each sampled parameter set and accept/reject based on a Euclidean distance between observed and simulated RSS.
+
+```{r}
+# Rejection ABC 
+# Function to compute RSS for ABC
+compute_rss_abc <- function(theta_sampled, X, y_true, theta_fixed, top_params) {
+  theta_full <- theta_best
+  theta_full[top_params] <- theta_sampled  # Replace sampled parameters
+  y_pred <- X %*% theta_full
+  rss <- sum((y_true - y_pred)^2)
+  return(rss)
+}
+
+# ABC settings
+n_samples <- 10000  # Total samples to draw
+n_accepted <- 500   # Target accepted samples
+tolerance <- quantile(replicate(1000, {
+  theta_sampled <- sample_prior(1)
+  compute_rss_abc(theta_sampled, X_train, train_data$y, theta_fixed, top_params)
+}), probs = 0.05)  # Accept top 5% closest fits
+
+# Run ABC
+accepted_samples <- matrix(nrow = 0, ncol = 2)
+colnames(accepted_samples) <- theta_names[top_params]
+
+for (i in 1:n_samples) {
+  theta_sampled <- sample_prior(1)
+  rss <- compute_rss_abc(theta_sampled, X_train, train_data$y, theta_fixed, top_params)
+  if (rss <= tolerance) {
+    accepted_samples <- rbind(accepted_samples, theta_sampled)
+    if (nrow(accepted_samples) >= n_accepted) break
+  }
+}
+
+```
+
+
+## Plot Posteriors
+
+We will plot the joint and marginal posterior distribution for those 2 parameters.
+
+```{r}
+library(GGally)
+# Plot Posteriors 
+posterior_df <- as.data.frame(accepted_samples)
+colnames(posterior_df) <- c("Param1", "Param2")
+
+# Joint and marginal posteriors
+ggpairs(posterior_df,
+        title = paste("Posterior Distributions for", theta_names[top_params[1]], "and", theta_names[top_params[2]]),
+        lower = list(continuous = "density"),
+        diag = list(continuous = "densityDiag")) +
+  theme_minimal()
+```
+We have 4 graphs, the top left and bottom right show us the parameter's marginal posterior distributions. Top right number indicate the correlation between the two parameters. The bottom left graph is the joint posterior distibution for both parameters. 
+
+Starting with the marginal posterior distributions, the peak value indicates the most probable value, in this case it's 8.5 for parameter 1 and 6.0 for parameter 2. Also, we can see that the posterior distribution for parameter 1 is much more wider compared to the posterior distribution of parameter 2. This means the uncertainity in parameter 1 is higher than parameter 2. 
+
+For Joint Posterior Distribution, it tells us how the two parameters relate to each other. We can see that the graph contains some elliptical contour. Since can't see consistent diagonal streak, we can say that they are independent. 
+
+In task 2.1, we computed the least squares estimates for all parameters. The values we obtained for the first two parameters in model 3 are:
+
+```{r}
+print("Least Squares Estimates for Selected Parameters:")
+print(theta_best[top_params])
+```
+
+$$
+\theta 1 = 8.5 \\
+\theta 2 = 6.2
+$$
+
+Since the most probable value for both parameters are very similar to the least square estimates, ABC validates the least squares results.
+
+Since the correlation between these two parameters is 0.062, it means there is no correlation. This is good because strong correlations suggest the model may be overparameterized (e.g., two terms explain the same variation).
+
+```{r}
+
+```
+
+
